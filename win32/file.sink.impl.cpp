@@ -56,7 +56,7 @@ init_handle(void **handle, std::string_view filename) {
 }
 
 bool
-seek_and_write(void **handle, size_t offset, ConstByteSpan data) {
+seek_and_write(void **handle, size_t offset, const std::vector<uint8_t> &data) {
     if (handle == nullptr) {
         throw std::runtime_error("Expected nonnull file handle");
     }
