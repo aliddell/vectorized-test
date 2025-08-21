@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint> // uint8_t
+#include <mutex>
+#include <string>
 #include <vector>
 
 namespace zarr {
