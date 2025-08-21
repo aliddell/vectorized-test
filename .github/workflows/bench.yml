@@ -46,7 +46,9 @@ jobs:
           cmake --build build --config Release
 
       - name: Run benchmarks
-        run: ./build/vectorized_test
+        run: |
+          ./build/vectorized_test
+          mv -f results.csv results-${{ matrix.platform }}.csv
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -54,3 +56,32 @@ jobs:
         with:
           name: benchmark-results-${{ matrix.platform }}
           path: results.csv
+
+  consolidate:
+    name: Consolidate benchmark results into a single zip
+    runs-on: ubuntu-latest
+    needs: benchmark
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Download benchmark results
+      uses: actions/download-artifact@v4
+      with:
+        name: benchmark-results-ubuntu-latest
+    - name: Consolidate results
+      run: |
+        mkdir consolidated_results
+        for file in results-*.csv; do
+        cp "$file" consolidated_results/
+        done
+    - name: Zip consolidated results
+      run: |
+        zip -r consolidated_results.zip consolidated_results
+
+    - name: Upload consolidated results
+      uses: actions/upload-artifact@v4
+      with:
+        name: consolidated-benchmark-results
+        path: consolidated_results.zip
