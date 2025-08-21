@@ -3,7 +3,7 @@ name: Benchmark vectorized vs. consolidated writes
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   benchmark:
