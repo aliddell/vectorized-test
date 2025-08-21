@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint> // uint8_t
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -18,8 +17,6 @@ namespace zarr {
         bool flush_();
 
     private:
-        std::mutex mutex_;
-
         void *handle_;
     };
 } // namespace zarr

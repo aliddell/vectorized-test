@@ -75,16 +75,11 @@ jobs:
       - name: Download benchmark results
         uses: actions/download-artifact@v4
         with:
-          name: benchmark-results-ubuntu-latest
-      - name: Consolidate results
-        run: |
-          mkdir consolidated_results
-          for file in results-*.csv; do
-          cp "$file" consolidated_results/
-          done
+          path: ${{ github.workspace }}/artifacts
+
       - name: Zip consolidated results
         run: |
-          zip -r consolidated_results.zip consolidated_results
+          zip -r consolidated_results.zip ${{ github.workspace }}/artifacts/benchmark-results-*.csv
 
       - name: Upload consolidated results
         uses: actions/upload-artifact@v4

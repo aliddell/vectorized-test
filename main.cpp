@@ -6,7 +6,9 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -42,9 +44,31 @@ namespace {
         zarr::FileSink filesink(path);
         filesink.write(0, shard);
     }
+
+    void write_threaded(const std::vector<std::vector<uint8_t>> &data, const std::string &path) {
+        std::vector<std::thread> threads;
+        threads.reserve(data.size());
+
+        zarr::FileSink filesink(path);
+        size_t offset = 0;
+        for (const auto &chunk: data) {
+            threads.emplace_back([&chunk, &filesink, offset]() {
+                if (!filesink.write(offset, chunk)) {
+                    std::cerr << "Failed to write chunk" << std::endl;
+                }
+            });
+            offset += chunk.size();
+        }
+
+        for (auto &t: threads) {
+            if (t.joinable()) {
+                t.join();
+            }
+        }
+    }
 }
 
-void kernel(size_t nchunks, size_t &consolidated, size_t &vectorized) {
+void kernel(size_t nchunks, size_t &consolidated, size_t &vectorized, size_t &threaded) {
     const auto chunk_data = make_data(nchunks, 128 * 128 * 128);
 
     // time the consolidated write
@@ -58,20 +82,26 @@ void kernel(size_t nchunks, size_t &consolidated, size_t &vectorized) {
     write_vectorized(chunk_data, "vectorized.bin");
     end = std::chrono::high_resolution_clock::now();
     vectorized = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // time the threaded write
+    start = std::chrono::high_resolution_clock::now();
+    write_threaded(chunk_data, "threaded.bin");
+    end = std::chrono::high_resolution_clock::now();
+    threaded = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
 int main() {
     const size_t bytes_per_chunk = 128 * 128 * 128; // 2 MiB per chunk
-    size_t consolidated_time, vectorized_time;
+    size_t consolidated_time, vectorized_time, threaded_time;
 
     std::ofstream results_csv("results.csv");
-    std::cout << "bytes_written,consolidated_time,vectorized_time" << std::endl;
-    results_csv << "bytes_written,consolidated_time,vectorized_time" << std::endl;
+    std::cout << "bytes_written,consolidated_time,vectorized_time,threaded_time" << std::endl;
+    results_csv << "bytes_written,consolidated_time,vectorized_time,threaded_time" << std::endl;
 
     for (auto nchunks = 32; nchunks < 1024; nchunks += 32) { // 1024 is IOV_MAX on Linux and macOS
         for (auto run = 0; run < 10; ++run) {
             try {
-                kernel(nchunks, consolidated_time, vectorized_time);
+                kernel(nchunks, consolidated_time, vectorized_time, threaded_time);
             } catch (const std::exception &exc) {
                 std::cerr << "Error: " << exc.what() << std::endl;
                 break;
@@ -79,7 +109,7 @@ int main() {
 
             std::stringstream ss;
             ss << nchunks * bytes_per_chunk << "," << consolidated_time << ","
-               << vectorized_time;
+               << vectorized_time << "," << threaded_time;
 
             std::cout << ss.str() << std::endl;
             results_csv << ss.str() << std::endl;
@@ -90,6 +120,9 @@ int main() {
             }
             if (fs::exists("vectorized.bin")) {
                 fs::remove("vectorized.bin");
+            }
+            if (fs::exists("threaded.bin")) {
+                fs::remove("threaded.bin");
             }
         }
     }
