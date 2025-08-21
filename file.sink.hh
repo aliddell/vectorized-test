@@ -1,7 +1,7 @@
 #pragma once
 
-#include <fstream>
-#include <string_view>
+#include <cstddef>
+#include <vector>
 
 namespace zarr {
     class FileSink {
