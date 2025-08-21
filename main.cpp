@@ -2,6 +2,7 @@
 #include "vectorized.file.writer.hh"
 
 #include <chrono>
+#include <cstring> // memcpy
 #include <iostream>
 #include <filesystem>
 #include <fstream>
