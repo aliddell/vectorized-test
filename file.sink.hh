@@ -1,13 +1,12 @@
 #pragma once
 
-#include <fstream>
-#include <string_view>
+#include <cstddef>
+#include <vector>
 
 namespace zarr {
     class FileSink {
     public:
-        FileSink(std::string_view filename);
-
+        explicit FileSink(const std::string& filename);
         ~FileSink();
 
         bool write(size_t offset, const std::vector<uint8_t> &data);

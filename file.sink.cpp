@@ -15,7 +15,7 @@ seek_and_write(void **, size_t, const std::vector<uint8_t> &);
 bool
 flush_file(void **);
 
-zarr::FileSink::FileSink(std::string_view filename) {
+zarr::FileSink::FileSink(const std::string& filename) {
     init_handle(&handle_, filename);
 }
 
@@ -25,7 +25,7 @@ zarr::FileSink::~FileSink() {
 
 bool
 zarr::FileSink::write(size_t offset, const std::vector<uint8_t> &data) {
-    if (data.data() == nullptr || data.size() == 0) {
+    if (data.data() == nullptr || data.empty()) {
         return true;
     }
 
