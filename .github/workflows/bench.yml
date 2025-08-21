@@ -1,0 +1,43 @@
+name: Benchmark vectorized vs. consolidated writes
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  benchmark:
+    name: Benchmark on ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - "ubuntu-latest"
+          - "ubuntu-24.04-arm"
+          - "macos-latest" # arm
+          - "macos-13" # x86_64
+          - "windows-latest"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=20
+          cmake --build build --config Release
+
+      - name: Run benchmarks
+        run: ./build/vectorized_test
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ matrix.platform }}
+          path: results.csv
