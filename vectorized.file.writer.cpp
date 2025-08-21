@@ -1,5 +1,6 @@
 #include "vectorized.file.writer.hh"
 
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 
@@ -124,10 +125,15 @@ zarr::VectorizedFileWriter::write_vectors(
     }
 
     const size_t nbytes_aligned = align_size_(total_bytes_to_write);
-    CHECK(nbytes_aligned >= total_bytes_to_write);
+    if (nbytes_aligned < total_bytes_to_write) {
+        std::cerr << "Aligned size is less than total bytes to write: "
+                  << nbytes_aligned << " < " << total_bytes_to_write
+                  << std::endl;
+        return false;
+    }
 
     auto* aligned_ptr =
-      static_cast<std::byte*>(_aligned_malloc(nbytes_aligned, page_size_));
+      static_cast<uint8_t*>(_aligned_malloc(nbytes_aligned, page_size_));
     if (!aligned_ptr) {
         return false;
     }

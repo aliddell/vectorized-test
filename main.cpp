@@ -69,7 +69,7 @@ int main() {
     results_csv << "bytes_written,consolidated_time,vectorized_time" << std::endl;
 
     for (auto nchunks = 32; nchunks < 1024; nchunks += 32) { // 1024 is IOV_MAX on Linux and macOS
-        for (auto run = 0; run < 20; ++run) {
+        for (auto run = 0; run < 10; ++run) {
             try {
                 kernel(nchunks, consolidated_time, vectorized_time);
             } catch (const std::exception &exc) {
