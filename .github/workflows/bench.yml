@@ -40,6 +40,11 @@ jobs:
           sudo mv cmake-3.31.8-linux-aarch64 /opt/cmake
           echo "/opt/cmake/bin" >> $GITHUB_PATH
 
+      - name: Install OpenMP
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          brew install libomp
+
       - name: Configure and build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20

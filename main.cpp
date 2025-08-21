@@ -41,6 +41,7 @@ namespace {
             shard_size += d.size();
         }
 
+        // write the shard to the file
         zarr::FileSink filesink(path);
         filesink.write(0, shard);
     }
@@ -66,9 +67,36 @@ namespace {
             }
         }
     }
+
+    void write_hybrid(const std::vector<std::vector<uint8_t>> &data, const std::string &path) {
+        // copy the data to the shard using an OpenMP parfor
+        const size_t nshards = data.size();
+        if (nshards == 0) {
+            std::cerr << "No data to write" << std::endl;
+            return;
+        }
+
+        std::vector<size_t> offsets(nshards, 0);
+        for (auto i = 0; i < nshards - 1; ++i) {
+            offsets[i + 1] = offsets[i] + data[i].size();
+        }
+        size_t shard_size = offsets.back() + data.back().size();
+        std::vector<uint8_t> shard(shard_size);
+
+#pragma omp parallel for default(none) shared(data, offsets, shard, nshards)
+        for (int i = 0; i < nshards; ++i) {
+            // each thread writes its own shard
+            const auto &d = data[i];
+            memcpy(shard.data() + offsets[i], d.data(), d.size());
+        }
+
+        // write the shard to the file
+        zarr::FileSink filesink(path);
+        filesink.write(0, shard);
+    }
 }
 
-void kernel(size_t nchunks, size_t &consolidated, size_t &vectorized, size_t &threaded) {
+void kernel(size_t nchunks, size_t &consolidated, size_t &vectorized, size_t &threaded, size_t &hybrid) {
     const auto chunk_data = make_data(nchunks, 128 * 128 * 128);
 
     // time the consolidated write
@@ -88,20 +116,26 @@ void kernel(size_t nchunks, size_t &consolidated, size_t &vectorized, size_t &th
     write_threaded(chunk_data, "threaded.bin");
     end = std::chrono::high_resolution_clock::now();
     threaded = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // time the hybrid write
+    start = std::chrono::high_resolution_clock::now();
+    write_hybrid(chunk_data, "hybrid.bin");
+    end = std::chrono::high_resolution_clock::now();
+    hybrid = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
 int main() {
     const size_t bytes_per_chunk = 128 * 128 * 128; // 2 MiB per chunk
-    size_t consolidated_time, vectorized_time, threaded_time;
+    size_t consolidated_time, vectorized_time, threaded_time, hybrid_time;
 
     std::ofstream results_csv("results.csv");
-    std::cout << "bytes_written,consolidated_time,vectorized_time,threaded_time" << std::endl;
-    results_csv << "bytes_written,consolidated_time,vectorized_time,threaded_time" << std::endl;
+    std::cout << "bytes_written,consolidated_time,vectorized_time,threaded_time,hybrid_time" << std::endl;
+    results_csv << "bytes_written,consolidated_time,vectorized_time,threaded_time,hybrid_time" << std::endl;
 
     for (auto nchunks = 32; nchunks < 1024; nchunks += 32) { // 1024 is IOV_MAX on Linux and macOS
         for (auto run = 0; run < 10; ++run) {
             try {
-                kernel(nchunks, consolidated_time, vectorized_time, threaded_time);
+                kernel(nchunks, consolidated_time, vectorized_time, threaded_time, hybrid_time);
             } catch (const std::exception &exc) {
                 std::cerr << "Error: " << exc.what() << std::endl;
                 break;
@@ -109,7 +143,7 @@ int main() {
 
             std::stringstream ss;
             ss << nchunks * bytes_per_chunk << "," << consolidated_time << ","
-               << vectorized_time << "," << threaded_time;
+               << vectorized_time << "," << threaded_time << "," << hybrid_time;
 
             std::cout << ss.str() << std::endl;
             results_csv << ss.str() << std::endl;
@@ -123,6 +157,9 @@ int main() {
             }
             if (fs::exists("threaded.bin")) {
                 fs::remove("threaded.bin");
+            }
+            if (fs::exists("hybrid.bin")) {
+                fs::remove("hybrid.bin");
             }
         }
     }
